@@ -1,0 +1,90 @@
+html {
+    overflow: hidden;
+}
+
+.tab {
+    display: table;
+    table-layout: fixed;
+    width: 100%;
+    font-size: 12px;
+}
+
+header, .navbar-brand, .navbar {
+    height: 32px;
+}
+
+.navbar-brand {
+    vertical-align: middle;
+}
+
+.navbar-brand > img {
+    width: 32px;
+}
+
+.container {
+    height: calc(100vh - 32px);
+}
+
+.tab-item {
+    display: table-cell;
+}
+
+.tab-item > a {
+    text-overflow: ellipsis;
+    -ms-text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.tab-item > a > .btn {
+    font-size: 12px;
+}
+
+.accordion-body, .accordion-header {
+    font-size: 12px;
+}
+
+.flex-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.editor {
+    height: 100%;
+    width: 100%;
+    flex-grow: 1;
+}
+
+.overflow-scroll {
+    overflow: scroll;
+    height: 100%;
+}
+
+.result {
+    flex-grow: 1;
+}
+
+.spinner {
+    animation: spin 5s infinite linear;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+#loading {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: #fff;
+    z-index: 99999999999;
+    margin: auto;
+    padding: auto;
+}
