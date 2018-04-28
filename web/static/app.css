@@ -49,6 +49,10 @@ header, .navbar-brand, .navbar {
     flex-direction: column;
 }
 
+.accordion-body {
+    margin-bottom: 0 !important;
+}
+
 .editor {
     height: 100%;
     width: 100%;

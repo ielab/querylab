@@ -85,7 +85,7 @@ func handleApiFile(c *gin.Context) {
 	}{bytes.NewBuffer(f).String()})
 	return
 }
-func handleApiFile(c *gin.Context) {
+func handleApiSave(c *gin.Context) {
 	filePath := c.Param("path")
 
 	f, err := ioutil.ReadFile(filePath[1:])
