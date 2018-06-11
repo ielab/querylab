@@ -44,6 +44,10 @@ header, .navbar-brand, .navbar {
     font-size: 12px;
 }
 
+.accordion-header:hover {
+    cursor: pointer;
+}
+
 .flex-container {
     display: flex;
     flex-direction: column;
@@ -91,4 +95,13 @@ header, .navbar-brand, .navbar {
     z-index: 99999999999;
     margin: auto;
     padding: auto;
+}
+
+#console {
+    margin: 0;
+    overflow-y: scroll;
+    height: 300px;
+    background-color: #1c1c1c;
+    color: #f9f9f9;
+    font-size: 12px;
 }

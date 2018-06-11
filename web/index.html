@@ -10,70 +10,80 @@
     <link rel="stylesheet" href="static/spectre-exp.min.css" type="text/css">
     <link rel="stylesheet" href="static/vis.min.css" type="text/css">
     <link rel="stylesheet" href="static/fontawesome-all.min.css" type="text/css">
+    <link rel="stylesheet" href="static/logtail.css" type="text/css">
     <link rel="stylesheet" href="static/app.css" type="text/css">
 </head>
 <body>
-<header class="navbar bg-dark text-light">
-    <section class="navbar-section">
-        <span class="navbar-brand mr-2 ml-2"><img src="static/images/luna512.png"></span>
-        <span class="navbar-brand" style="line-height: 32px">QueryLab</span>
-    </section>
-    <section class="navbar-section"></section>
-</header>
-<div id="loading"><img src="static/images/luna512.png" class="spinner"
-                       style="display:block;margin-left: auto;margin-right: auto">
-</div>
-<div id="vue" class="container columns col-gapless p-0">
-    <div class="column col-2 bg-gray flex-container">
-        <file v-bind:file="file" v-on:load="addTab"></file>
+<div id="vue">
+    <header class="navbar bg-dark text-light">
+        <section class="navbar-section">
+            <span class="navbar-brand mr-2 ml-2"><img src="static/images/luna512.png"></span>
+            <span class="navbar-brand" style="line-height: 32px">QueryLab</span>
+        </section>
+        <section class="navbar-section"></section>
+        <section class="navbar-section">
+            <div class="btn-group btn-group">
+                <button class="btn" v-on:click="runPipeline"><i class="fa fa-play text-success"></i></button>
+                <button class="btn" v-on:click="stopPipeline"><i class="fa fa-stop text-error"></i></button>
+            </div>
+        </section>
+    </header>
+    <div id="loading"><img src="static/images/luna512.png" class="spinner"
+                           style="display:block;margin-left: auto;margin-right: auto">
     </div>
-    <div class="column col-5 flex-container">
-        <ul class="tab">
-            <li class="tab-item">
-                <button class="btn btn-action" v-on:click="newTab"><i class="icon icon-plus"></i></button>
-            </li>
-            <tab v-for="e in editing" :key="e.id" v-bind:name="e.name" v-on:close="closeTab" v-on:load="loadTab"></tab>
-        </ul>
-        <editor editor-id="query" :content="input" v-on:change-content="updateInput"></editor>
-    </div>
-    <div class="column col-5 flex-container overflow-scroll">
-        <!-- mutually exclusive Accordions example (with same input names) -->
-        <div class="accordion">
-            <input type="checkbox" id="r1" name="c1" hidden title="" checked>
-            <label class="accordion-header text-bold bg-primary text-light" for="r1">
-                Configure
-            </label>
-            <div class="accordion-body">
-                <div class="form-group">
-                    <label class="form-label" for="input-queries">Query Path</label>
-                    <input class="form-input" type="text" id="input-queries" placeholder="/data/queries">
+    <div class="container columns col-gapless p-0">
+        <div class="column col-2 bg-gray flex-container">
+            <button class="btn btn-primary" v-on:click="updateFiles"><i class="fa fa-undo"></i></button>
+            <file v-bind:file="file" v-on:load="addTab"></file>
+        </div>
+        <div class="column col-5 flex-container">
+            <ul class="tab">
+                <li class="tab-item">
+                    <div class="btn-group btn-group">
+                        <button class="btn btn-action" v-on:click="newTab"><i class="icon icon-plus"></i></button>
+                    </div>
+                </li>
+                <tab v-for="e in editing" :key="e.id" v-bind:name="e.name" v-on:close="closeTab"
+                     v-on:load="loadTab"></tab>
+            </ul>
+            <editor editor-id="query" :content="input" v-on:change-content="updateInput"></editor>
+        </div>
+        <div class="column col-5 flex-container overflow-scroll">
+            <!-- mutually exclusive Accordions example (with same input names) -->
+            <div class="accordion">
+                <input type="checkbox" id="r1" name="c1" hidden title="" checked>
+                <label class="accordion-header text-bold bg-secondary" for="r1">
+                    Configure
+                </label>
+                <div class="accordion-body">
+                    <div class="form-group">
+                        <label class="form-label" for="input-queries">Query Path</label>
+                        <input class="form-input" type="text" id="input-queries" v-model="queryPath"
+                               placeholder="/data/queries">
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="accordion">
-            <input type="checkbox" id="r2" name="c2" hidden title="">
-            <label class="accordion-header text-bold bg-primary text-light" for="r2">
-                Monitor
-            </label>
-            <div class="accordion-body">
-                <p>CPU: 82%</p>
-                <meter class="meter" value="82" min="0" max="100" low="30" high="80"></meter>
-                <p>Memory: 30%</p>
-                <meter class="meter" value="30" min="0" max="100" low="30" high="80"></meter>
+            <div class="accordion">
+                <input type="checkbox" id="r2" name="c2" hidden title="" checked>
+                <label class="accordion-header text-bold bg-secondary" for="r2">
+                    Monitor
+                </label>
+                <div class="accordion-body">
+                    <p>CPU: 82%</p>
+                    <meter class="meter" value="82" min="0" max="100" low="30" high="80"></meter>
+                    <p>Memory: 30%</p>
+                    <meter class="meter" value="30" min="0" max="100" low="30" high="80"></meter>
+                </div>
             </div>
-        </div>
-        <div class="accordion">
-            <input type="checkbox" id="r3" name="c3" hidden title="">
-            <label class="accordion-header text-bold bg-primary text-light" for="r3">
-                Results
-            </label>
-            <div class="accordion-body overflow-scroll">
-                <div class="empty">
-                    <div class="empty-icon">
-                        <i class="icon icon-flag"></i>
-                    </div>
-                    <p class="empty-title h5">There are no results</p>
-                    <p class="empty-subtitle">Run a pipeline to see results.</p>
+            <div class="accordion">
+                <input type="checkbox" id="r3" name="c3" hidden title="" checked>
+                <label class="accordion-header text-bold bg-secondary" for="r3">
+                    Console
+                </label>
+                <div class="accordion-body overflow-scroll">
+                    <pre id="console">Loading...</pre>
+                    <a href="#" id="console-pause" class="btn btn-primary"
+                       style="position: absolute;bottom: 32px;right: 32px;">Pause</a>
                 </div>
             </div>
         </div>
@@ -99,7 +109,7 @@
     </div>
 </script>
 
-
+<!-- App view. -->
 <script type="text/javascript" src="static/vue.js"></script>
 <script type="text/javascript" src="static/ace.js"></script>
 <script type="text/javascript" src="static/worker-json.js"></script>
@@ -107,5 +117,9 @@
 <script type="text/javascript" src="static/lodash.min.js"></script>
 <script type="text/javascript" src="static/shortcut.min.js"></script>
 <script type="text/javascript" src="static/app.js"></script>
+
+<!-- Console view. -->
+<script src="static/jquery.min.js" type="text/javascript"></script>
+<script src="static/logtail.js" type="text/javascript"></script>
 </body>
 </html>

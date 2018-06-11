@@ -4,10 +4,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
-	"io/ioutil"
+	"github.com/hscells/groove"
+	"fmt"
+	"io"
 	"os"
-	"path"
-	"bytes"
 )
 
 const (
@@ -22,86 +22,19 @@ type file struct {
 	Files []file   `json:"files"`
 }
 
-func handleIndex(c *gin.Context) {
-	c.HTML(http.StatusOK, "index.html", nil)
-}
-
-func addFile(f os.FileInfo, parent file) (file, error) {
-	if f.IsDir() {
-		files, err := ioutil.ReadDir(path.Join(path.Join(parent.Path...), f.Name()))
-		if err != nil {
-			return file{}, nil
-		}
-		dir := file{Name: f.Name(), Type: dirFile, Path: append(parent.Path, f.Name()), Files: []file{}}
-		for _, f := range files {
-			nf, err := addFile(f, dir)
-			if err != nil {
-				return file{}, nil
-			}
-			dir.Files = append(dir.Files, nf)
-		}
-		return dir, nil
-	} else {
-		return file{
-			Type:  fileFile,
-			Name:  f.Name(),
-			Path:  parent.Path,
-			Files: nil,
-		}, nil
-	}
-}
-
-func handleApiFiles(c *gin.Context) {
-	files, err := ioutil.ReadDir(".")
-	if err != nil {
-		c.AbortWithError(500, err)
-		return
-	}
-
-	root := file{Type: dirFile, Name: "/", Path: []string{}, Files: []file{}}
-	for _, f := range files {
-		nf, err := addFile(f, root)
-		if err != nil {
-			c.AbortWithError(500, err)
-			return
-		}
-		root.Files = append(root.Files, nf)
-	}
-
-	c.IndentedJSON(200, root)
-	return
-}
-
-func handleApiFile(c *gin.Context) {
-	filePath := c.Param("path")
-
-	f, err := ioutil.ReadFile(filePath[1:])
-	if err != nil {
-		c.AbortWithError(404, err)
-	}
-
-	c.JSON(200, struct {
-		Data string `json:"data"`
-	}{bytes.NewBuffer(f).String()})
-	return
-}
-func handleApiSave(c *gin.Context) {
-	filePath := c.Param("path")
-
-	f, err := ioutil.ReadFile(filePath[1:])
-	if err != nil {
-		c.AbortWithError(404, err)
-	}
-
-	c.JSON(200, struct {
-		Data string `json:"data"`
-	}{bytes.NewBuffer(f).String()})
-	return
+type pipelineResult struct {
+	Type   groove.ResultType `json:"type"`
+	Result string            `json:"pipelineResult"`
 }
 
 func main() {
 
-	log.Println("Setting up routes...")
+	lf, err := os.OpenFile("web/static/log", os.O_WRONLY|os.O_RDONLY|os.O_CREATE, 0644)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	lf.Truncate(0)
+
 	router := gin.Default()
 
 	router.LoadHTMLFiles("web/index.html")
@@ -111,8 +44,28 @@ func main() {
 	router.GET("/", handleIndex)
 	router.GET("/api/files", handleApiFiles)
 	router.GET("/api/file/*path", handleApiFile)
-	router.GET("/api/save/*path", handleApiSave)
+	router.POST("/api/save/*path", handleApiSave)
+	router.POST("/api/run", handleApiRun)
 
-	log.Println("let's go!")
+	mw := io.MultiWriter(lf, os.Stdout)
+	log.SetOutput(mw)
+
+	fmt.Print(`
+
+ .d88888b.                                     888          888      
+d88P" "Y88b                                    888          888      
+888     888                                    888          888      
+888     888 888  888  .d88b.  888d888 888  888 888  8888b.  88888b.  
+888     888 888  888 d8P  Y8b 888P"   888  888 888     "88b 888 "88b 
+888 Y8b 888 888  888 88888888 888     888  888 888 .d888888 888  888 
+Y88b.Y8b88P Y88b 888 Y8b.     888     Y88b 888 888 888  888 888 d88P 
+ "Y888888"   "Y88888  "Y8888  888      "Y88888 888 "Y888888 88888P"  
+       Y8b                                 888                       
+                                      Y8b d88P                       
+                                       "Y88P"
+
+ Harry Scells 2018
+
+`)
 	log.Fatal(http.ListenAndServe(":5862", router))
 }

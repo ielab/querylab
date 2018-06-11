@@ -81,7 +81,7 @@ Vue.component("tab", {
     methods: {
         load: function () {
             this.active = true;
-            this.$emit("load", this.data);
+            this.$emit("load", this.data, this.$props.name);
         },
         close: function () {
             this.$emit("close", this)
@@ -106,9 +106,11 @@ let vm = new Vue({
     el: "#vue",
     data: {
         editing: [],
+        openFile: "",
         file: {},
         input: `{}`,
-        output: ""
+        output: "",
+        queryPath: "",
     },
     methods: {
         updateInput: function (val) {
@@ -125,8 +127,9 @@ let vm = new Vue({
                 name: e.name
             }));
         },
-        loadTab: function (data) {
-            this.input = data
+        loadTab: function (data, name) {
+            this.input = data;
+            this.openFile = name;
         },
         addTab: function (name) {
             this.editing.push({name: name})
@@ -134,28 +137,62 @@ let vm = new Vue({
         newTab: function () {
             let name = prompt("Name the new file");
             this.addTab(name)
+        },
+        runPipeline: function () {
+            let request = new XMLHttpRequest();
+            let self = this;
+            request.addEventListener("load", function (ev) {
+                if (ev.currentTarget.status === 200) {
+                    self.output = JSON.parse(ev.currentTarget.responseText)
+                } else {
+                    alert(ev.currentTarget.responseText)
+                }
+            });
+            request.open("POST", "/api/run");
+            request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            request.send("pipeline=" + this.input + "&path=" + self.queryPath);
+        },
+        stopPipeline: function () {
+
+        },
+        updateFiles: function () {
+            let request = new XMLHttpRequest();
+            let self = this;
+            request.addEventListener("load", function (ev) {
+                if (ev.currentTarget.status === 200) {
+                    self.file = JSON.parse(ev.currentTarget.responseText)
+                }
+            });
+            request.open("GET", "/api/files");
+            request.setRequestHeader("Content-Type", "application/json");
+            request.send(this.input);
+        },
+        saveFile: function () {
+            let request = new XMLHttpRequest();
+            let self = this;
+            request.addEventListener("load", function (ev) {
+                if (ev.currentTarget.status === 200) {
+                    self.output = JSON.parse(ev.currentTarget.responseText)
+                } else {
+                    alert(ev.currentTarget.responseText)
+                }
+            });
+            request.open("POST", "/api/save/" + this.openFile);
+            request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            request.send("content=" + this.input);
         }
     },
     mounted: function () {
-        let request = new XMLHttpRequest();
-        let self = this;
-        request.addEventListener("load", function (ev) {
-            if (ev.currentTarget.status === 200) {
-                self.file = JSON.parse(ev.currentTarget.responseText)
-            }
-        });
-        request.open("GET", "/api/files");
-        request.send();
+        this.updateFiles()
     }
 });
 
 document.addEventListener("keydown", function () {
     if ((event.which === 115 || event.which === 83) && (event.ctrlKey || event.metaKey) || (event.which === 19)) {
         event.preventDefault();
-        console.log("saved");
+        vm.saveFile();
         return false;
     }
-
     return true;
 });
 

@@ -1,0 +1,213 @@
+package main
+
+import (
+	"github.com/hscells/groove"
+	"github.com/hscells/transmute/backend"
+	"log"
+	"bytes"
+	"path/filepath"
+	"strings"
+	"fmt"
+	"os"
+	"io/ioutil"
+	"path"
+	"github.com/gin-gonic/gin"
+	"github.com/hscells/boogie"
+	"encoding/json"
+	"net/http"
+)
+
+func addFile(f os.FileInfo, parent file) (file, error) {
+	if f.IsDir() {
+		files, err := ioutil.ReadDir(path.Join(path.Join(parent.Path...), f.Name()))
+		if err != nil {
+			return file{}, nil
+		}
+		dir := file{Name: f.Name(), Type: dirFile, Path: append(parent.Path, f.Name()), Files: []file{}}
+		for _, f := range files {
+			nf, err := addFile(f, dir)
+			if err != nil {
+				return file{}, nil
+			}
+			dir.Files = append(dir.Files, nf)
+		}
+		return dir, nil
+	} else {
+		return file{
+			Type:  fileFile,
+			Name:  f.Name(),
+			Path:  parent.Path,
+			Files: nil,
+		}, nil
+	}
+}
+
+func handleApiFiles(c *gin.Context) {
+	files, err := ioutil.ReadDir(".")
+	if err != nil {
+		c.AbortWithError(500, err)
+		return
+	}
+
+	root := file{Type: dirFile, Name: "/", Path: []string{}, Files: []file{}}
+	for _, f := range files {
+		nf, err := addFile(f, root)
+		if err != nil {
+			c.AbortWithError(500, err)
+			return
+		}
+		root.Files = append(root.Files, nf)
+	}
+
+	c.IndentedJSON(200, root)
+	return
+}
+
+func handleApiFile(c *gin.Context) {
+	filePath := c.Param("path")
+
+	f, err := ioutil.ReadFile(filePath[1:])
+	if err != nil {
+		c.String(http.StatusNotFound, err.Error())
+		return
+	}
+
+	c.JSON(200, struct {
+		Data string `json:"data"`
+	}{bytes.NewBuffer(f).String()})
+	return
+}
+
+func handleApiSave(c *gin.Context) {
+	filePath := c.Param("path")
+	content := c.PostForm("content")
+
+	var path string
+	if len(filePath) > 0 {
+		path = filePath[1:]
+	} else {
+		c.String(http.StatusInternalServerError, "no path specified")
+		return
+	}
+
+	// Check if the file exists before saving.
+	if _, err := os.Stat(path); err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	err := ioutil.WriteFile(path, []byte(content), 0644)
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.Status(200)
+	return
+}
+
+func handleApiRun(c *gin.Context) {
+	queryPath := c.PostForm("path")
+	pipelineData := c.PostForm("pipeline")
+
+	var dsl boogie.Pipeline
+	err := json.Unmarshal([]byte(pipelineData), &dsl)
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	pipeline, err := boogie.CreatePipeline(dsl)
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	evaluations := make([]string, len(dsl.Evaluations))
+
+	trecEvalBuff := bytes.NewBuffer([]byte{})
+
+	pipelineChan := make(chan groove.PipelineResult)
+	resultChan := make(chan pipelineResult)
+
+	var trecEvalFile *os.File
+	if len(dsl.Output.Trec.Output) > 0 {
+		trecEvalFile, err = os.OpenFile(dsl.Output.Trec.Output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		trecEvalFile.Truncate(0)
+		trecEvalFile.Seek(0, 0)
+		defer trecEvalFile.Close()
+	}
+
+	go pipeline.Execute(queryPath, pipelineChan)
+	for {
+		result := <-pipelineChan
+		switch result.Type {
+		case groove.Measurement:
+			// Process the measurement outputs.
+			for i, formatter := range dsl.Output.Measurements {
+				resultChan <- pipelineResult{groove.Measurement, result.Measurements[i]}
+				err := ioutil.WriteFile(formatter.Filename, bytes.NewBufferString(result.Measurements[i]).Bytes(), 0644)
+				if err != nil {
+					c.String(http.StatusInternalServerError, err.Error())
+					return
+				}
+			}
+		case groove.Transformation:
+			// Output the transformed queries
+			if len(dsl.Transformations.Output) > 0 {
+				s, err := backend.NewCQRQuery(result.Transformation.Transformation).StringPretty()
+				if err != nil {
+					log.Fatalln(err)
+				}
+				resultChan <- pipelineResult{groove.Transformation, s}
+				q := bytes.NewBufferString(s).Bytes()
+				err = ioutil.WriteFile(filepath.Join(pipeline.Transformations.Output, result.Transformation.Name), q, 0644)
+				if err != nil {
+					c.String(http.StatusInternalServerError, err.Error())
+					return
+				}
+			}
+		case groove.Evaluation:
+			for i, e := range result.Evaluations {
+				evaluations[i] = e
+				resultChan <- pipelineResult{groove.Evaluation, e}
+			}
+		case groove.TrecResult:
+			if result.TrecResults != nil && len(*result.TrecResults) > 0 {
+				l := make([]string, len(*result.TrecResults))
+				for i, r := range *result.TrecResults {
+					l[i] = r.String()
+				}
+				trecEvalBuff.Write([]byte(strings.Join(l, "\n") + "\n"))
+				trecEvalFile.Write([]byte(strings.Join(l, "\n") + "\n"))
+				result.TrecResults = nil
+			}
+			resultChan <- pipelineResult{groove.TrecResult, trecEvalBuff.String()}
+			trecEvalBuff.Truncate(0)
+		case groove.Error:
+			if len(result.Topic) > 0 {
+				log.Printf("an error occurred in topic %v", result.Topic)
+			} else {
+				log.Println("an error occurred")
+			}
+			resultChan <- pipelineResult{groove.Error, fmt.Sprintf("%v", err)}
+			c.AbortWithError(500, err)
+			return
+		case groove.Done:
+			resultChan <- pipelineResult{groove.Done, "done!"}
+		}
+	}
+	// Process the evaluation outputs.
+	for i, formatter := range dsl.Output.Evaluations.Measurements {
+		err := ioutil.WriteFile(formatter.Filename, bytes.NewBufferString(evaluations[i]).Bytes(), 0644)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	c.Status(200)
+	return
+}
