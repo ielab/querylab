@@ -1,5 +1,7 @@
 # Querylab
 
+![home](assets/images/home.png)
+
 QueryLab is a framework for constructing and executing information retrieval experiment pipelines. The framework
 as a whole is built primarily for domain specific applications such as medical literature search for systematic
 reviews, or finding factually or legally applicable case law in the legal domain; however it can also be used
@@ -60,7 +62,7 @@ which is similar to what is seen in web search --- a string of characters restri
 is a Boolean query --- which combines keyword queries with logical operators. A CQR query in human-readable
 notation takes the form of JSON.
 
-https://github.com/hscells/cqr
+[https://github.com/hscells/cqr](https://github.com/hscells/cqr)
 
 ### Transmute
 
@@ -71,7 +73,7 @@ transmute library and command-line tool is a parser/compiler for queries from on
 another. Currently, transmute can transform Medline and PubMed queries, and CQR queries into
 Elasticsearch queries (the Terrier query language is currently being implemented).</p>
 
-https://github.com/hscells/transmute
+[https://github.com/hscells/transmute](https://github.com/hscells/transmute)
 
 ### Groove
 
@@ -86,7 +88,7 @@ Currently, groove can load Medline and PubMed queries (query languages commonly 
 reviews) via transmute, and LexesNexes queries (a query language commonly used in legal IR) via an
 implementation integrated into groove.
 
-https://github.com/hscells/groove
+[https://github.com/hscells/groove](https://github.com/hscells/groove)
 
 ### Boogie
 
@@ -103,7 +105,7 @@ evaluation measures to record, and, finally, the last item specifies how the res
 output and in which formats (the trec_eval-style results file is also output so as to record the
 retrieval results.
 
-https://github.com/hscells/boogie
+[https://github.com/hscells/boogie](https://github.com/hscells/boogie)
 
 ## Addendum
 
@@ -120,5 +122,5 @@ Year = {2018}
 ```
 
 For support, please open an issue on the respective GitHub repositories, or on the Querylab Github
-repository, at https://github.com/ielab/querylab.
+repository, at [https://github.com/ielab/querylab](https://github.com/ielab/querylab).
 
