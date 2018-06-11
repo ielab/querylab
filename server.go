@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
-	"github.com/hscells/groove"
 	"fmt"
 	"io"
 	"os"
@@ -20,11 +19,6 @@ type file struct {
 	Name  string   `json:"name"`
 	Path  []string `json:"path"`
 	Files []file   `json:"files"`
-}
-
-type pipelineResult struct {
-	Type   groove.ResultType `json:"type"`
-	Result string            `json:"pipelineResult"`
 }
 
 func main() {
@@ -46,6 +40,7 @@ func main() {
 	router.GET("/api/file/*path", handleApiFile)
 	router.POST("/api/save/*path", handleApiSave)
 	router.POST("/api/run", handleApiRun)
+	router.GET("/ws/statistics", handleWsStatistics)
 
 	mw := io.MultiWriter(lf, os.Stdout)
 	log.SetOutput(mw)

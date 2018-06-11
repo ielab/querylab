@@ -1,21 +1,73 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
+	"github.com/hscells/boogie"
 	"github.com/hscells/groove"
 	"github.com/hscells/transmute/backend"
+	"io/ioutil"
 	"log"
-	"bytes"
+	"net/http"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
-	"fmt"
-	"os"
-	"io/ioutil"
-	"path"
-	"github.com/gin-gonic/gin"
-	"github.com/hscells/boogie"
-	"encoding/json"
-	"net/http"
+	"time"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/cpu"
 )
+
+// upgrader is a struct that upgrades a web socket.
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
+var (
+	writeWait = 2000 * time.Millisecond
+)
+
+type statistics struct {
+	CPU    []float64
+	Memory float64
+}
+
+func wsStatistics(ws *websocket.Conn) {
+
+	writeTicker := time.NewTicker(writeWait)
+
+	// defer closing of web socket
+	defer func() {
+		writeTicker.Stop()
+		ws.Close()
+	}()
+	// create a new go routine for the web socket
+	for {
+		select {
+		case <-writeTicker.C:
+			ws.SetWriteDeadline(time.Now().Add(writeWait))
+			v, _ := mem.VirtualMemory()
+			c, _ := cpu.Percent(0, true)
+			if err := ws.WriteJSON(statistics{Memory: v.UsedPercent, CPU: c}); err != nil {
+				log.Println("writing", err)
+				return
+			}
+		}
+	}
+}
+
+func handleWsStatistics(c *gin.Context) {
+	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		c.String(http.StatusNotFound, err.Error())
+		return
+	}
+
+	go wsStatistics(ws)
+}
 
 func addFile(f os.FileInfo, parent file) (file, error) {
 	if f.IsDir() {
@@ -45,7 +97,7 @@ func addFile(f os.FileInfo, parent file) (file, error) {
 func handleApiFiles(c *gin.Context) {
 	files, err := ioutil.ReadDir(".")
 	if err != nil {
-		c.AbortWithError(500, err)
+		c.String(http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -53,7 +105,7 @@ func handleApiFiles(c *gin.Context) {
 	for _, f := range files {
 		nf, err := addFile(f, root)
 		if err != nil {
-			c.AbortWithError(500, err)
+			c.String(http.StatusNotFound, err.Error())
 			return
 		}
 		root.Files = append(root.Files, nf)
@@ -82,21 +134,15 @@ func handleApiSave(c *gin.Context) {
 	filePath := c.Param("path")
 	content := c.PostForm("content")
 
-	var path string
+	var p string
 	if len(filePath) > 0 {
-		path = filePath[1:]
+		p = filePath[1:]
 	} else {
 		c.String(http.StatusInternalServerError, "no path specified")
 		return
 	}
 
-	// Check if the file exists before saving.
-	if _, err := os.Stat(path); err != nil {
-		c.String(http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	err := ioutil.WriteFile(path, []byte(content), 0644)
+	err := ioutil.WriteFile(p, []byte(content), 0644)
 	if err != nil {
 		c.String(http.StatusInternalServerError, err.Error())
 		return
@@ -128,7 +174,6 @@ func handleApiRun(c *gin.Context) {
 	trecEvalBuff := bytes.NewBuffer([]byte{})
 
 	pipelineChan := make(chan groove.PipelineResult)
-	resultChan := make(chan pipelineResult)
 
 	var trecEvalFile *os.File
 	if len(dsl.Output.Trec.Output) > 0 {
@@ -144,11 +189,13 @@ func handleApiRun(c *gin.Context) {
 	go pipeline.Execute(queryPath, pipelineChan)
 	for {
 		result := <-pipelineChan
+		if result.Type == groove.Done {
+			break
+		}
 		switch result.Type {
 		case groove.Measurement:
 			// Process the measurement outputs.
 			for i, formatter := range dsl.Output.Measurements {
-				resultChan <- pipelineResult{groove.Measurement, result.Measurements[i]}
 				err := ioutil.WriteFile(formatter.Filename, bytes.NewBufferString(result.Measurements[i]).Bytes(), 0644)
 				if err != nil {
 					c.String(http.StatusInternalServerError, err.Error())
@@ -162,7 +209,6 @@ func handleApiRun(c *gin.Context) {
 				if err != nil {
 					log.Fatalln(err)
 				}
-				resultChan <- pipelineResult{groove.Transformation, s}
 				q := bytes.NewBufferString(s).Bytes()
 				err = ioutil.WriteFile(filepath.Join(pipeline.Transformations.Output, result.Transformation.Name), q, 0644)
 				if err != nil {
@@ -173,7 +219,6 @@ func handleApiRun(c *gin.Context) {
 		case groove.Evaluation:
 			for i, e := range result.Evaluations {
 				evaluations[i] = e
-				resultChan <- pipelineResult{groove.Evaluation, e}
 			}
 		case groove.TrecResult:
 			if result.TrecResults != nil && len(*result.TrecResults) > 0 {
@@ -185,7 +230,6 @@ func handleApiRun(c *gin.Context) {
 				trecEvalFile.Write([]byte(strings.Join(l, "\n") + "\n"))
 				result.TrecResults = nil
 			}
-			resultChan <- pipelineResult{groove.TrecResult, trecEvalBuff.String()}
 			trecEvalBuff.Truncate(0)
 		case groove.Error:
 			if len(result.Topic) > 0 {
@@ -193,11 +237,8 @@ func handleApiRun(c *gin.Context) {
 			} else {
 				log.Println("an error occurred")
 			}
-			resultChan <- pipelineResult{groove.Error, fmt.Sprintf("%v", err)}
 			c.AbortWithError(500, err)
 			return
-		case groove.Done:
-			resultChan <- pipelineResult{groove.Done, "done!"}
 		}
 	}
 	// Process the evaluation outputs.

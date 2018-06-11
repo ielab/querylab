@@ -58,9 +58,9 @@ header, .navbar-brand, .navbar {
 }
 
 .editor {
-    height: 100%;
+    height: calc(100vh - 76px);
     width: 100%;
-    flex-grow: 1;
+    /*flex-grow: 1;*/
 }
 
 .overflow-scroll {
