@@ -8,6 +8,8 @@ import (
 	"github.com/hscells/boogie"
 	"github.com/hscells/groove"
 	"github.com/hscells/transmute/backend"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,8 +18,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"github.com/shirou/gopsutil/mem"
-	"github.com/shirou/gopsutil/cpu"
 )
 
 // upgrader is a struct that upgrades a web socket.

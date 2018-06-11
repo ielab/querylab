@@ -1,16 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"io"
 	"log"
 	"net/http"
-	"fmt"
-	"io"
 	"os"
 )
 
 const (
-	dirFile  = iota
+	dirFile = iota
 	fileFile
 )
 
@@ -46,7 +46,6 @@ func main() {
 	log.SetOutput(mw)
 
 	fmt.Print(`
-
  .d88888b.                                     888          888      
 d88P" "Y88b                                    888          888      
 888     888                                    888          888      
@@ -58,9 +57,8 @@ Y88b.Y8b88P Y88b 888 Y8b.     888     Y88b 888 888 888  888 888 d88P
        Y8b                                 888                       
                                       Y8b d88P                       
                                        "Y88P"
-
  Harry Scells 2018
-
+ https://ielab.io/querylab
 `)
 	log.Fatal(http.ListenAndServe(":5862", router))
 }

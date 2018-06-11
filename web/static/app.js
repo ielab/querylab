@@ -1,7 +1,7 @@
 const host = 'localhost:5862';
 const TARGET_ALL = 'target_all_components';
 
-const modelist = ace.require("ace/ext/modelist")
+const modelist = ace.require("ace/ext/modelist");
 
 function dispatch(component, event, data) {
     const parent = component.$parent;
