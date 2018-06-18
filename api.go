@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"fmt"
 )
 
 // upgrader is a struct that upgrades a web socket.
@@ -52,7 +53,7 @@ func wsStatistics(ws *websocket.Conn) {
 			v, _ := mem.VirtualMemory()
 			c, _ := cpu.Percent(0, true)
 			if err := ws.WriteJSON(statistics{Memory: v.UsedPercent, CPU: c}); err != nil {
-				log.Println("writing", err)
+				fmt.Println("writing", err)
 				return
 			}
 		}
@@ -179,7 +180,8 @@ func handleApiRun(c *gin.Context) {
 	if len(dsl.Output.Trec.Output) > 0 {
 		trecEvalFile, err = os.OpenFile(dsl.Output.Trec.Output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			log.Fatalln(err)
+			c.String(http.StatusInternalServerError, err.Error())
+			return
 		}
 		trecEvalFile.Truncate(0)
 		trecEvalFile.Seek(0, 0)
@@ -207,7 +209,8 @@ func handleApiRun(c *gin.Context) {
 			if len(dsl.Transformations.Output) > 0 {
 				s, err := backend.NewCQRQuery(result.Transformation.Transformation).StringPretty()
 				if err != nil {
-					log.Fatalln(err)
+					c.String(http.StatusInternalServerError, err.Error())
+					return
 				}
 				q := bytes.NewBufferString(s).Bytes()
 				err = ioutil.WriteFile(filepath.Join(pipeline.Transformations.Output, result.Transformation.Name), q, 0644)
