@@ -4,6 +4,24 @@
 
 Querylab is a framework for constructing and executing information retrieval experiment pipelines. The framework as a whole is built primarily for domain specific applications such as medical literature search for systematic reviews, or finding factually or legally applicable case law in the legal domain; however it can also be used for more general tasks. There are a number of pre-implemented components that enable common information retrieval experiments such as ad-hoc retrieval or query analysis through query performance predictors. In addition, this collection of tools seeks to be user friendly, well documented, and easily extendible. Finally, the entire pipeline can be distributed as a single binary with no dependencies, ready to use with a simple domain specific language (DSL) for constructing pipelines.
 
+## Installation
+
+The best way to install Querylab is to [download](https://github.com/ielab/querylab/archive/master.zip) or clone this repository and build from source.
+
+This is because the web server files must be loaded when the application starts.
+
+After the source is downloaded or cloned, build it with [Go](https://golang.org/):
+
+```bash
+go build *.go
+```
+
+This should produce a binary file that can be executed:
+
+```bash
+./querylab
+```
+
 ## Links
 
  - [Project website](https://ielab.io/querylab)
