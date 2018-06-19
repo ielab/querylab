@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 	"fmt"
+	"github.com/go-errors/errors"
 )
 
 // upgrader is a struct that upgrades a web socket.
@@ -192,6 +193,7 @@ func handleApiRun(c *gin.Context) {
 	for {
 		result := <-pipelineChan
 		if result.Type == groove.Done {
+			log.Println("Completed pipeline, formatting files")
 			break
 		}
 		switch result.Type {
@@ -240,6 +242,8 @@ func handleApiRun(c *gin.Context) {
 			} else {
 				log.Println("an error occurred")
 			}
+			err := result.Error
+			log.Println(string(errors.Wrap(err, 1).Stack()))
 			c.AbortWithError(500, err)
 			return
 		}
@@ -252,6 +256,7 @@ func handleApiRun(c *gin.Context) {
 			return
 		}
 	}
+	log.Println("done!")
 	c.Status(200)
 	return
 }
