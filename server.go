@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/gobuffalo/packr/v2"
 	"io"
 	"log"
 	"net/http"
@@ -23,19 +24,27 @@ type file struct {
 
 func main() {
 
-	lf, err := os.OpenFile("web/static/log", os.O_WRONLY|os.O_RDONLY|os.O_CREATE, 0644)
+	lf, err := os.OpenFile("querylab.log", os.O_WRONLY|os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	lf.Truncate(0)
+
+	staticBox := packr.New("static", "./web/static")
+	webBox := packr.New("web", "./web")
 
 	router := gin.Default()
 
-	router.LoadHTMLFiles("web/index.html")
-	router.Static("/static/", "./web/static")
+	router.GET("/static/*any", gin.WrapH(http.StripPrefix("/static/", http.FileServer(staticBox))))
 
 	// Main query interface.
-	router.GET("/", handleIndex)
+	router.GET("/", func(c *gin.Context) {
+		s, err := webBox.Find("index.html")
+		if err != nil {
+			log.Fatal(err)
+		}
+		c.Data(http.StatusOK, "text/html", s)
+	})
+
 	router.GET("/api/files", handleApiFiles)
 	router.GET("/api/file/*path", handleApiFile)
 	router.POST("/api/save/*path", handleApiSave)
@@ -60,5 +69,5 @@ Y88b.Y8b88P Y88b 888 Y8b.     888     Y88b 888 888 888  888 888 d88P
  Harry Scells 2018
  https://ielab.io/querylab
 `)
-	log.Fatal(http.ListenAndServe(":5862", router))
+	log.Fatal(router.Run(":5862"))
 }

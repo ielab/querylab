@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/go-errors/errors"
 	"github.com/gorilla/websocket"
 	"github.com/hscells/boogie"
-	"github.com/hscells/groove"
+	gpipeline "github.com/hscells/groove/pipeline"
 	"github.com/hscells/transmute/backend"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
@@ -18,8 +20,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"fmt"
-	"github.com/go-errors/errors"
 )
 
 // upgrader is a struct that upgrades a web socket.
@@ -155,7 +155,6 @@ func handleApiSave(c *gin.Context) {
 }
 
 func handleApiRun(c *gin.Context) {
-	queryPath := c.PostForm("path")
 	pipelineData := c.PostForm("pipeline")
 
 	var dsl boogie.Pipeline
@@ -175,7 +174,7 @@ func handleApiRun(c *gin.Context) {
 
 	trecEvalBuff := bytes.NewBuffer([]byte{})
 
-	pipelineChan := make(chan groove.PipelineResult)
+	pipelineChan := make(chan gpipeline.Result)
 
 	var trecEvalFile *os.File
 	if len(dsl.Output.Trec.Output) > 0 {
@@ -189,15 +188,15 @@ func handleApiRun(c *gin.Context) {
 		defer trecEvalFile.Close()
 	}
 
-	go pipeline.Execute(queryPath, pipelineChan)
+	go pipeline.Execute(pipelineChan)
 	for {
 		result := <-pipelineChan
-		if result.Type == groove.Done {
+		if result.Type == gpipeline.Done {
 			log.Println("Completed pipeline, formatting files")
 			break
 		}
 		switch result.Type {
-		case groove.Measurement:
+		case gpipeline.Measurement:
 			// Process the measurement outputs.
 			for i, formatter := range dsl.Output.Measurements {
 				err := ioutil.WriteFile(formatter.Filename, bytes.NewBufferString(result.Measurements[i]).Bytes(), 0644)
@@ -206,7 +205,7 @@ func handleApiRun(c *gin.Context) {
 					return
 				}
 			}
-		case groove.Transformation:
+		case gpipeline.Transformation:
 			// Output the transformed queries
 			if len(dsl.Transformations.Output) > 0 {
 				s, err := backend.NewCQRQuery(result.Transformation.Transformation).StringPretty()
@@ -221,11 +220,11 @@ func handleApiRun(c *gin.Context) {
 					return
 				}
 			}
-		case groove.Evaluation:
+		case gpipeline.Evaluation:
 			for i, e := range result.Evaluations {
 				evaluations[i] = e
 			}
-		case groove.TrecResult:
+		case gpipeline.TrecResult:
 			if result.TrecResults != nil && len(*result.TrecResults) > 0 {
 				l := make([]string, len(*result.TrecResults))
 				for i, r := range *result.TrecResults {
@@ -236,7 +235,7 @@ func handleApiRun(c *gin.Context) {
 				result.TrecResults = nil
 			}
 			trecEvalBuff.Truncate(0)
-		case groove.Error:
+		case gpipeline.Error:
 			if len(result.Topic) > 0 {
 				log.Printf("an error occurred in topic %v", result.Topic)
 			} else {
